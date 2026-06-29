@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, sans-serif;
+  --brand-50: #F9F0F0;
+  --brand-100: #F0D9D9;
+  --brand-200: #DFB0B0;
+  --brand-300: #C97C7C;
+  --brand-400: #AE4848;
+  --brand-500: #8F2020;
+  --brand-600: #7B1C1C;
+  --brand-700: #621616;
+  --brand-800: #4A1010;
+  --brand-900: #310A0A;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #F8F7F5;
+  color: #28221C;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #C4BDB5;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9E9289;
+}
+
+/* Markdown content styling */
+.markdown-body h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #28221C;
+  margin: 1.5rem 0 0.75rem;
+}
+.markdown-body h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #28221C;
+  margin: 1.25rem 0 0.5rem;
+}
+.markdown-body p {
+  color: #3F3830;
+  line-height: 1.7;
+  margin: 0.75rem 0;
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+  color: #3F3830;
+  line-height: 1.7;
+}
+.markdown-body li {
+  margin: 0.25rem 0;
+}
+.markdown-body pre {
+  background: #1A1512;
+  color: #F0EEE9;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.markdown-body code {
+  background: #F0D9D9;
+  color: #621616;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+}
+.markdown-body strong {
+  font-weight: 600;
+  color: #28221C;
+}
+.markdown-body a {
+  color: #7B1C1C;
+  text-decoration: underline;
+}
+
+@keyframes rowFlash {
+  0% {
+    background-color: #F9F0F0;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.row-flash {
+  animation: rowFlash 1.2s ease-out;
+}
+
+.bg-maroon-50 {
+  background-color: var(--brand-50);
+}
+.bg-maroon-100 {
+  background-color: var(--brand-100);
+}
+.bg-maroon-600 {
+  background-color: var(--brand-600);
+}
+.hover\:bg-maroon-50:hover {
+  background-color: var(--brand-50);
+}
+.hover\:bg-maroon-700:hover {
+  background-color: var(--brand-700);
+}
+.disabled\:bg-maroon-300:disabled {
+  background-color: var(--brand-300);
+}
+.text-maroon-600 {
+  color: var(--brand-600);
+}
+.text-maroon-700 {
+  color: var(--brand-700);
+}
+.border-maroon-200 {
+  border-color: var(--brand-200);
+}
+.border-maroon-600 {
+  border-color: var(--brand-600);
+}
+.focus\:border-maroon-400:focus {
+  border-color: var(--brand-400);
+}
+.focus\:ring-maroon-400:focus {
+  --tw-ring-color: var(--brand-400);
+}
+.accent-maroon-600 {
+  accent-color: var(--brand-600);
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.toast-in {
+  animation: toastIn 0.2s ease-out;
+}
