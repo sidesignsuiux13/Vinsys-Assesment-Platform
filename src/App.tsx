@@ -11,6 +11,7 @@ import { ToastViewport } from '@/components/ui/Toast';
 import Login from '@/pages/auth/Login';
 import Unauthorized from '@/pages/auth/Unauthorized';
 import Profile from '@/pages/Profile';
+import SessionRoom from '@/pages/SessionRoom';
 
 import AdminDashboard from '@/pages/admin/Dashboard';
 import AdminUsers from '@/pages/admin/Users';
@@ -20,7 +21,6 @@ import AdminQuestions from '@/pages/admin/Questions';
 import AdminAssessments from '@/pages/admin/Assessments';
 import AdminAssessmentDetail from '@/pages/admin/AssessmentDetail';
 import AdminReports from '@/pages/admin/Reports';
-import AdminExams from '@/pages/admin/Exams';
 import AdminResults from '@/pages/admin/Results';
 import AdminSettings from '@/pages/admin/AdminSettings';
 
@@ -34,9 +34,12 @@ import StudentFeedback from '@/pages/student/Feedback';
 
 import TrainerDashboard from '@/pages/trainer/Dashboard';
 import TrainerSessions from '@/pages/trainer/Sessions';
+import TrainerFeedbacks from '@/pages/trainer/Feedbacks';
+import TrainerReports from '@/pages/trainer/Reports';
 
 import HRDashboard from '@/pages/hr/Dashboard';
 import HRRankings from '@/pages/hr/Rankings';
+import HRFeedbackForms from '@/pages/hr/FeedbackForms';
 
 export default function App() {
   const rehydrateAuth = useAuthStore((s) => s.rehydrate);
@@ -56,6 +59,14 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
+        <Route
+          path="/session-room"
+          element={
+            <AuthGuard>
+              <SessionRoom />
+            </AuthGuard>
+          }
+        />
 
         <Route
           element={
@@ -100,7 +111,7 @@ export default function App() {
           <Route path="/admin/questions" element={<AdminQuestions />} />
           <Route path="/admin/assessments" element={<AdminAssessments />} />
           <Route path="/admin/assessments/:id" element={<AdminAssessmentDetail />} />
-          <Route path="/admin/exams" element={<AdminExams />} />
+          <Route path="/admin/exams" element={<Navigate to="/admin/assessments" replace />} />
           <Route path="/admin/results" element={<AdminResults />} />
           <Route path="/admin/reports" element={<AdminReports />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
@@ -120,6 +131,7 @@ export default function App() {
           <Route path="/student/assessment" element={<AssessmentPreCheck />} />
           <Route path="/student/results" element={<StudentResults />} />
           <Route path="/student/feedback" element={<StudentFeedback />} />
+          <Route path="/student/feedbacks" element={<StudentFeedback />} />
         </Route>
 
         {/* Trainer */}
@@ -132,6 +144,8 @@ export default function App() {
         >
           <Route path="/trainer/dashboard" element={<TrainerDashboard />} />
           <Route path="/trainer/sessions" element={<TrainerSessions />} />
+          <Route path="/trainer/reports" element={<TrainerReports />} />
+          <Route path="/trainer/feedbacks" element={<TrainerFeedbacks />} />
         </Route>
 
         {/* HR */}
@@ -144,6 +158,7 @@ export default function App() {
         >
           <Route path="/hr/dashboard" element={<HRDashboard />} />
           <Route path="/hr/rankings" element={<HRRankings />} />
+          <Route path="/hr/feedback-forms" element={<HRFeedbackForms />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />

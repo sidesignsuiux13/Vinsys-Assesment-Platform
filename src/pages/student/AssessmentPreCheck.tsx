@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Wifi, Camera, Mic, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Wifi, Camera, Mic, CheckCircle2, XCircle, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { useAssessmentStore } from '@/store/assessmentStore';
 import { ASSESSMENT } from '@/mock/assessments';
+import { COURSE, getCourse } from '@/mock/courses';
 
 type CheckState = 'pending' | 'granted' | 'denied';
 
@@ -24,8 +25,10 @@ function CheckRow({ icon: Icon, label, state }: { icon: typeof Wifi; label: stri
 
 export default function AssessmentPreCheck() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const user = useAuthStore((s) => s.currentUser)!;
   const startAttempt = useAssessmentStore((s) => s.startAttempt);
+  const course = getCourse(params.get('courseId') ?? COURSE.id) ?? COURSE;
 
   const [camera, setCamera] = useState<CheckState>('pending');
   const [mic, setMic] = useState<CheckState>('pending');
@@ -70,6 +73,19 @@ export default function AssessmentPreCheck() {
         <p className="text-sm text-neutral-400 mt-0.5">
           {ASSESSMENT.title} · {ASSESSMENT.duration_minutes} minutes · {ASSESSMENT.total_marks} marks
         </p>
+      </div>
+
+      <div className="bg-white border border-neutral-200 rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-maroon-50">
+            <BookOpen className="h-5 w-5 text-maroon-600" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-neutral-800">{course.title}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{course.description}</p>
+            <p className="mt-2 text-xs text-neutral-400">{course.modules.length} modules · {course.duration_hours} training hours</p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-xl p-5">

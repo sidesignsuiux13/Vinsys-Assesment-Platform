@@ -32,7 +32,7 @@ export default function StudentFeedback() {
           </div>
           <h2 className="text-lg font-semibold text-neutral-800">Thank you for your feedback!</h2>
           <p className="text-sm text-neutral-500 mt-1">
-            Your responses help us improve the training experience for everyone.
+            Your responses for {COURSE.title} help us improve the training experience for everyone.
           </p>
         </div>
       </div>
@@ -42,8 +42,14 @@ export default function StudentFeedback() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-neutral-800">Training Feedback</h1>
-        <p className="text-sm text-neutral-400 mt-0.5">{COURSE.title}</p>
+        <h1 className="text-xl font-semibold text-neutral-800">Feedbacks</h1>
+        <p className="text-sm text-neutral-400 mt-0.5">Submit feedback against your enrolled course.</p>
+      </div>
+
+      <div className="bg-white border border-neutral-200 rounded-xl p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Course selected for feedback</p>
+        <h2 className="mt-1 text-base font-semibold text-neutral-800">{COURSE.title}</h2>
+        <p className="mt-1 text-sm text-neutral-500">{COURSE.duration_hours} hours · {COURSE.modules.length} modules</p>
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-xl p-6 space-y-5">

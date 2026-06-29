@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Star } from 'lucide-react';
+import { Plus, Star, Video } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,20 @@ const STUDENT_PROGRESS = [
   { name: 'Arjun Mehta', modules: 4, status: 'completed', lastActive: '2026-04-20' },
   { name: 'Priya Sharma', modules: 4, status: 'completed', lastActive: '2026-04-20' },
   { name: 'Rahul Nair', modules: 2, status: 'in_progress', lastActive: '2026-04-19' },
+];
+
+const ATTENDANCE_DATA = [
+  { week: 'W1', attendance: 78 },
+  { week: 'W2', attendance: 84 },
+  { week: 'W3', attendance: 88 },
+  { week: 'W4', attendance: 92 },
+];
+
+const MODULE_COMPLETION = [
+  { module: 'HTML', completed: 3 },
+  { module: 'JS', completed: 3 },
+  { module: 'React', completed: 2 },
+  { module: 'APIs', completed: 2 },
 ];
 
 export default function TrainerDashboard() {
@@ -49,6 +64,24 @@ export default function TrainerDashboard() {
     { key: 'module', label: 'Module' },
     { key: 'mode', label: 'Mode', render: (s) => <Badge variant="neutral">{s.mode}</Badge> },
     { key: 'duration', label: 'Duration' },
+    {
+      key: 'join',
+      label: 'Session',
+      render: (s) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={s.mode === 'Offline'}
+          onClick={() => {
+            window.open(`/session-room?role=trainer&module=${encodeURIComponent(s.module)}`, '_blank', 'noopener,noreferrer');
+            push('success', 'Opening session room...');
+          }}
+        >
+          <Video className="h-4 w-4" />
+          Join Session
+        </Button>
+      ),
+    },
   ];
 
   const progressCols: Column<(typeof STUDENT_PROGRESS)[number]>[] = [
@@ -81,6 +114,38 @@ export default function TrainerDashboard() {
             <h2 className="text-sm font-semibold text-neutral-800">Student Progress</h2>
           </div>
           <DataTable columns={progressCols} data={STUDENT_PROGRESS} rowKey={(r) => r.name} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="bg-white border border-neutral-200 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-neutral-800 mb-4">Attendance Trend</h2>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={ATTENDANCE_DATA} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2DDD8" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 12, fill: '#7A6E66' }} axisLine={{ stroke: '#E2DDD8' }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: '#7A6E66' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #E2DDD8', fontSize: 12 }} />
+                <Line type="monotone" dataKey="attendance" name="Attendance %" stroke="#7B1C1C" strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white border border-neutral-200 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-neutral-800 mb-4">Module Completion</h2>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={MODULE_COMPLETION} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2DDD8" vertical={false} />
+                <XAxis dataKey="module" tick={{ fontSize: 12, fill: '#7A6E66' }} axisLine={{ stroke: '#E2DDD8' }} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#7A6E66' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: '#F9F0F0' }} contentStyle={{ borderRadius: 8, border: '1px solid #E2DDD8', fontSize: 12 }} />
+                <Bar dataKey="completed" name="Completed Students" fill="#7B1C1C" radius={[4, 4, 0, 0]} maxBarSize={56} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 

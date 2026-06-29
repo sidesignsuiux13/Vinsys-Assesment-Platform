@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2, Lock, BookOpen } from 'lucide-react';
+import { CheckCircle2, Lock, BookOpen, ClipboardList, Video } from 'lucide-react';
 import ModuleView from './ModuleView';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/components/ui/Toast';
+import { Button } from '@/components/ui/Button';
 import { COURSE } from '@/mock/courses';
+import { ASSESSMENT } from '@/mock/assessments';
 import { getCompletedModules, setModuleComplete } from '@/lib/progress';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -50,6 +52,21 @@ export default function StudentCourse() {
   return (
     <div className="flex gap-6">
       <div className="w-72 shrink-0 space-y-2">
+        <div className="rounded-xl border border-neutral-200 bg-white p-3">
+          <p className="text-sm font-medium text-neutral-800">Upcoming Live Session</p>
+          <p className="mt-1 text-xs text-neutral-400">React Essentials · 10:00 AM</p>
+          <Button
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => {
+              window.open('/session-room?role=student&module=React%20Essentials', '_blank', 'noopener,noreferrer');
+              push('success', 'Opening session room...');
+            }}
+          >
+            <Video className="h-4 w-4" />
+            Join Session
+          </Button>
+        </div>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Modules</h2>
         {modules.map((m, i) => {
           const done = completed.includes(m.id);
@@ -89,6 +106,34 @@ export default function StudentCourse() {
             </button>
           );
         })}
+
+        <div className="pt-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Assessments</h2>
+          <div className={`rounded-xl border p-3 ${allDone ? 'border-maroon-200 bg-maroon-50' : 'border-neutral-200 bg-white opacity-70'}`}>
+            <div className="flex items-start gap-2">
+              {allDone ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+              ) : (
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-neutral-300" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-neutral-800">{ASSESSMENT.title}</p>
+                <p className="mt-1 text-xs text-neutral-400">
+                  {allDone ? 'Course complete · Assessment available' : 'Complete all modules to unlock'}
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="mt-3 w-full"
+              disabled={!allDone}
+              onClick={() => navigate(`/student/assessment?courseId=${COURSE.id}`)}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Take Assessment
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 min-w-0 bg-white border border-neutral-200 rounded-xl p-6">

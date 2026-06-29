@@ -1,147 +1,428 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Eye } from 'lucide-react';
-import { DataTable, Column } from '@/components/ui/DataTable';
-import { Badge, BadgeVariant } from '@/components/ui/Badge';
+import { ChangeEvent, useMemo, useRef, useState } from 'react';
+import { CalendarPlus, FilePlus2, FileQuestion, Pencil, Send, Upload, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Input, Select, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Input, Select } from '@/components/ui/Input';
 import { useToastStore } from '@/components/ui/Toast';
-import { ASSESSMENTS } from '@/mock/assessments';
-import { MCQ_QUESTIONS, CODING_QUESTIONS } from '@/mock/questions';
-import { COURSE } from '@/mock/courses';
 import { uuid } from '@/lib/constants';
-import type { Assessment, AssessmentStatus } from '@/types';
+import { COURSE, COURSES } from '@/mock/courses';
+import { USERS } from '@/mock/users';
+import type { User } from '@/types';
 
-const STATUS_BADGE: Record<AssessmentStatus, BadgeVariant> = {
-  draft: 'draft',
-  active: 'active',
-  closed: 'closed',
+type ExamMode = 'Online' | 'Offline' | 'Hybrid';
+type PaperStatus = 'Draft' | 'Published';
+type ScheduleStatus = 'Upcoming' | 'Invited' | 'Completed';
+
+interface QuestionPaper {
+  id: string;
+  title: string;
+  courseId: string;
+  category: string;
+  durationMinutes: number;
+  totalMarks: number;
+  questionCount: number;
+  status: PaperStatus;
+  lastUpdated: string;
+}
+
+interface ScheduledAssessment {
+  id: string;
+  name: string;
+  questionPaperId: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  mode: ExamMode;
+  invitedUserIds: string[];
+  status: ScheduleStatus;
+}
+
+const initialPapers: QuestionPaper[] = [
+  { id: 'paper-fswd-final', title: 'FSWD Final Assessment Paper', courseId: COURSE.id, category: 'Technical', durationMinutes: 90, totalMarks: 80, questionCount: 42, status: 'Published', lastUpdated: '2026-06-18' },
+  { id: 'paper-react-basics', title: 'React Fundamentals Check', courseId: COURSE.id, category: 'React', durationMinutes: 45, totalMarks: 35, questionCount: 24, status: 'Draft', lastUpdated: '2026-06-22' },
+];
+
+const initialSchedules: ScheduledAssessment[] = [
+  { id: 'schedule-july-fswd', name: 'July FSWD Certification Assessment', questionPaperId: 'paper-fswd-final', date: '2026-07-05', startTime: '10:00', durationMinutes: 90, mode: 'Online', invitedUserIds: ['user-student1', 'user-student2'], status: 'Invited' },
+  { id: 'schedule-react-practice', name: 'React Practice Assessment', questionPaperId: 'paper-react-basics', date: '2026-07-12', startTime: '14:30', durationMinutes: 45, mode: 'Hybrid', invitedUserIds: ['user-student3'], status: 'Upcoming' },
+];
+
+const paperDraftInitial = {
+  title: '',
+  courseId: COURSE.id,
+  category: 'Technical',
+  durationMinutes: 60,
+  totalMarks: 50,
+  instructions: '',
+  manualQuestions: '',
 };
 
-export default function AdminAssessments() {
-  const navigate = useNavigate();
-  const push = useToastStore((s) => s.push);
-  const [items, setItems] = useState<Assessment[]>(() => ASSESSMENTS.map((a) => ({ ...a })));
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    duration: 60,
-    total: 40,
-    passing: 24,
-    negative: false,
-    mcqIds: MCQ_QUESTIONS.map((q) => q.id),
-    codingIds: CODING_QUESTIONS.map((q) => q.id),
-  });
+const scheduleDraftInitial = {
+  name: '',
+  questionPaperId: '',
+  date: '',
+  startTime: '',
+  durationMinutes: 60,
+  mode: 'Online' as ExamMode,
+  instructions: '',
+  invitedUserIds: [] as string[],
+};
 
-  const save = (status: AssessmentStatus) => {
-    if (!form.title.trim()) {
-      push('error', 'Assessment title is required.');
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function countManualQuestions(text: string) {
+  return text.split('\n').map((line) => line.trim()).filter(Boolean).length;
+}
+
+function getStudentUsers(): User[] {
+  return USERS.filter((user) => user.role === 'student');
+}
+
+export default function AdminAssessments() {
+  const push = useToastStore((s) => s.push);
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<'schedule' | 'papers'>('schedule');
+  const [papers, setPapers] = useState<QuestionPaper[]>(initialPapers);
+  const [schedules, setSchedules] = useState<ScheduledAssessment[]>(initialSchedules);
+  const [paperModalOpen, setPaperModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [paperDraft, setPaperDraft] = useState(paperDraftInitial);
+  const [scheduleDraft, setScheduleDraft] = useState(scheduleDraftInitial);
+  const [csvQuestionCount, setCsvQuestionCount] = useState(0);
+
+  const studentUsers = useMemo(() => getStudentUsers(), []);
+  const courseById = useMemo(() => new Map(COURSES.map((course) => [course.id, course])), []);
+  const paperById = useMemo(() => new Map(papers.map((paper) => [paper.id, paper])), [papers]);
+  const selectedPaper = paperById.get(scheduleDraft.questionPaperId);
+  const totalQuestionSetCount = countManualQuestions(paperDraft.manualQuestions) + csvQuestionCount;
+
+  const resetPaperForm = () => {
+    setPaperDraft(paperDraftInitial);
+    setCsvQuestionCount(0);
+  };
+
+  const resetScheduleForm = () => {
+    setScheduleDraft({ ...scheduleDraftInitial, questionPaperId: papers[0]?.id ?? '', invitedUserIds: [] });
+    setEditingScheduleId(null);
+  };
+
+  const openScheduleModal = () => {
+    setEditingScheduleId(null);
+    setScheduleDraft({ ...scheduleDraftInitial, questionPaperId: papers[0]?.id ?? '', invitedUserIds: studentUsers.map((user) => user.id) });
+    setScheduleModalOpen(true);
+  };
+
+  const openEditScheduleModal = (assessment: ScheduledAssessment) => {
+    setEditingScheduleId(assessment.id);
+    setScheduleDraft({
+      name: assessment.name,
+      questionPaperId: assessment.questionPaperId,
+      date: assessment.date,
+      startTime: assessment.startTime,
+      durationMinutes: assessment.durationMinutes,
+      mode: assessment.mode,
+      instructions: '',
+      invitedUserIds: assessment.invitedUserIds,
+    });
+    setScheduleModalOpen(true);
+  };
+
+  const handleCSVUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = String(reader.result ?? '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const importedCount = Math.max(0, rows.length - 1);
+      if (!importedCount) {
+        push('error', 'No question rows found in the CSV.');
+        return;
+      }
+      setCsvQuestionCount((count) => count + importedCount);
+      push('success', `${importedCount} question${importedCount > 1 ? 's' : ''} added from CSV.`);
+    };
+    reader.onerror = () => push('error', 'Could not read the selected CSV file.');
+    reader.readAsText(file);
+  };
+
+  const saveQuestionPaper = (status: PaperStatus) => {
+    if (!paperDraft.title.trim()) {
+      push('error', 'Question paper title is required.');
       return;
     }
-    const a: Assessment = {
-      id: uuid(),
-      title: form.title,
-      course_id: COURSE.id,
-      duration_minutes: form.duration,
-      total_marks: form.total,
-      passing_marks: form.passing,
-      negative_marking: form.negative,
-      status,
-      mcq_question_ids: form.mcqIds,
-      coding_question_ids: form.codingIds,
+    const questionCount = countManualQuestions(paperDraft.manualQuestions) + csvQuestionCount;
+    if (!questionCount) {
+      push('error', 'Add questions manually or upload a question set CSV.');
+      return;
+    }
+
+    setPapers((current) => [
+      { id: uuid(), title: paperDraft.title, courseId: paperDraft.courseId, category: paperDraft.category, durationMinutes: paperDraft.durationMinutes, totalMarks: paperDraft.totalMarks, questionCount, status, lastUpdated: today() },
+      ...current,
+    ]);
+    push('success', status === 'Published' ? 'Question paper published.' : 'Question paper saved as draft.');
+    setPaperModalOpen(false);
+    resetPaperForm();
+  };
+
+  const toggleInvitee = (userId: string) => {
+    setScheduleDraft((draft) => ({
+      ...draft,
+      invitedUserIds: draft.invitedUserIds.includes(userId)
+        ? draft.invitedUserIds.filter((id) => id !== userId)
+        : [...draft.invitedUserIds, userId],
+    }));
+  };
+
+  const saveScheduledAssessment = () => {
+    if (!scheduleDraft.name.trim()) {
+      push('error', 'Scheduled assessment name is required.');
+      return;
+    }
+    if (!scheduleDraft.questionPaperId) {
+      push('error', 'Select a question paper.');
+      return;
+    }
+    if (!scheduleDraft.date || !scheduleDraft.startTime) {
+      push('error', 'Date and start time are required.');
+      return;
+    }
+
+    const scheduledAssessment: ScheduledAssessment = {
+      id: editingScheduleId ?? uuid(),
+      name: scheduleDraft.name,
+      questionPaperId: scheduleDraft.questionPaperId,
+      date: scheduleDraft.date,
+      startTime: scheduleDraft.startTime,
+      durationMinutes: scheduleDraft.durationMinutes,
+      mode: scheduleDraft.mode,
+      invitedUserIds: scheduleDraft.invitedUserIds,
+      status: scheduleDraft.invitedUserIds.length ? 'Invited' : 'Upcoming',
     };
-    setItems((prev) => [a, ...prev]);
-    push('success', status === 'active' ? 'Assessment activated.' : 'Assessment saved as draft.');
-    setOpen(false);
-    setForm({ title: '', duration: 60, total: 40, passing: 24, negative: false, mcqIds: MCQ_QUESTIONS.map((q) => q.id), codingIds: CODING_QUESTIONS.map((q) => q.id) });
+
+    setSchedules((current) =>
+      editingScheduleId
+        ? current.map((item) => (item.id === editingScheduleId ? scheduledAssessment : item))
+        : [scheduledAssessment, ...current]
+    );
+    push('success', editingScheduleId ? 'Scheduled assessment updated.' : 'Assessment scheduled.');
+    setScheduleModalOpen(false);
+    resetScheduleForm();
   };
 
-  const toggleId = (key: 'mcqIds' | 'codingIds', id: string) => {
-    setForm((f) => {
-      const list = f[key];
-      return { ...f, [key]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] };
-    });
+  const inviteUsers = (assessment: ScheduledAssessment) => {
+    setSchedules((current) => current.map((item) => (item.id === assessment.id ? { ...item, status: 'Invited' } : item)));
+    push('success', `Invite sent to ${assessment.invitedUserIds.length} user${assessment.invitedUserIds.length === 1 ? '' : 's'}.`);
   };
 
-  const columns: Column<Assessment>[] = [
-    { key: 'title', label: 'Title', render: (a) => <span className="font-medium text-neutral-800">{a.title}</span> },
-    { key: 'course', label: 'Course', render: () => <span className="text-neutral-500">FSWD</span> },
-    { key: 'duration', label: 'Duration', render: (a) => <span className="text-neutral-500">{a.duration_minutes} min</span> },
-    { key: 'total', label: 'Total Marks', render: (a) => a.total_marks },
-    { key: 'passing', label: 'Passing', render: (a) => a.passing_marks },
-    { key: 'status', label: 'Status', render: (a) => <Badge variant={STATUS_BADGE[a.status]} /> },
+  const paperColumns: Column<QuestionPaper>[] = [
     {
-      key: 'actions',
-      label: 'Actions',
-      render: (a) => (
-        <button onClick={() => navigate(`/admin/assessments/${a.id}`)} className="flex items-center gap-1 text-xs text-maroon-600 hover:underline">
-          <Eye className="h-3.5 w-3.5" /> View
-        </button>
+      key: 'title',
+      label: 'Question Paper',
+      render: (paper) => (
+        <div>
+          <p className="font-medium text-neutral-800">{paper.title}</p>
+          <p className="text-xs text-neutral-400">{courseById.get(paper.courseId)?.title ?? 'Course removed'}</p>
+        </div>
+      ),
+    },
+    { key: 'category', label: 'Category', render: (paper) => <span className="text-neutral-500">{paper.category}</span> },
+    { key: 'duration', label: 'Duration', render: (paper) => <span>{paper.durationMinutes} min</span> },
+    { key: 'marks', label: 'Marks', render: (paper) => <span className="font-medium">{paper.totalMarks}</span> },
+    { key: 'questions', label: 'Questions', render: (paper) => paper.questionCount },
+    { key: 'status', label: 'Status', render: (paper) => <Badge variant={paper.status === 'Published' ? 'active' : 'draft'}>{paper.status}</Badge> },
+    { key: 'updated', label: 'Updated', render: (paper) => <span className="text-neutral-500">{paper.lastUpdated}</span> },
+  ];
+
+  const scheduleColumns: Column<ScheduledAssessment>[] = [
+    {
+      key: 'name',
+      label: 'Scheduled Assessment',
+      render: (assessment) => (
+        <div>
+          <p className="font-medium text-neutral-800">{assessment.name}</p>
+          <p className="text-xs text-neutral-400">{paperById.get(assessment.questionPaperId)?.title ?? 'Question paper removed'}</p>
+        </div>
+      ),
+    },
+    { key: 'date', label: 'Date', render: (assessment) => <span>{assessment.date}</span> },
+    { key: 'time', label: 'Time', render: (assessment) => <span>{assessment.startTime}</span> },
+    { key: 'duration', label: 'Duration', render: (assessment) => <span>{assessment.durationMinutes} min</span> },
+    { key: 'mode', label: 'Mode', render: (assessment) => <Badge variant="neutral">{assessment.mode}</Badge> },
+    { key: 'invited', label: 'Users', render: (assessment) => <span>{assessment.invitedUserIds.length} invited</span> },
+    { key: 'status', label: 'Status', render: (assessment) => <Badge variant={assessment.status === 'Completed' ? 'closed' : assessment.status === 'Invited' ? 'active' : 'draft'}>{assessment.status}</Badge> },
+    {
+      key: 'edit',
+      label: 'Edit',
+      render: (assessment) => (
+        <Button size="sm" variant="ghost" onClick={() => openEditScheduleModal(assessment)}>
+          <Pencil className="h-4 w-4" />
+          Edit
+        </Button>
+      ),
+    },
+    {
+      key: 'invite',
+      label: 'Action',
+      render: (assessment) => (
+        <Button size="sm" variant="secondary" onClick={() => inviteUsers(assessment)} disabled={!assessment.invitedUserIds.length}>
+          <Send className="h-4 w-4" />
+          Invite
+        </Button>
       ),
     },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Create Assessment
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-1">
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeTab === 'schedule' ? 'bg-maroon-600 text-white' : 'text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Scheduled Assessments
+          </button>
+          <button
+            onClick={() => setActiveTab('papers')}
+            className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeTab === 'papers' ? 'bg-maroon-600 text-white' : 'text-neutral-600 hover:bg-neutral-50'}`}
+          >
+            <FileQuestion className="h-4 w-4" />
+            Question Papers
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={() => setPaperModalOpen(true)}>
+            <FilePlus2 className="h-4 w-4" />
+            Add Question Paper
+          </Button>
+          <Button onClick={openScheduleModal}>
+            <CalendarPlus className="h-4 w-4" />
+            Schedule Assessment
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-xl">
-        <DataTable columns={columns} data={items} rowKey={(a) => a.id} />
+        {activeTab === 'schedule' && <DataTable columns={scheduleColumns} data={schedules} rowKey={(assessment) => assessment.id} />}
+        {activeTab === 'papers' && <DataTable columns={paperColumns} data={papers} rowKey={(paper) => paper.id} />}
       </div>
 
       <Modal
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        title="Create Assessment"
-        width={560}
+        isOpen={paperModalOpen}
+        onClose={() => { setPaperModalOpen(false); resetPaperForm(); }}
+        title="Add Question Paper"
+        width={680}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button variant="secondary" onClick={() => save('draft')}>Save as Draft</Button>
-            <Button onClick={() => save('active')}>Activate</Button>
+            <Button variant="ghost" onClick={() => { setPaperModalOpen(false); resetPaperForm(); }}>Cancel</Button>
+            <Button variant="secondary" onClick={() => saveQuestionPaper('Draft')}>Save Draft</Button>
+            <Button onClick={() => saveQuestionPaper('Published')}>Publish Paper</Button>
           </>
         }
       >
         <div className="space-y-4">
-          <Input label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. FSWD Mid-term" />
-          <div className="grid grid-cols-2 gap-3">
-            <Select label="Course" defaultValue={COURSE.id}>
-              <option value={COURSE.id}>{COURSE.title}</option>
+          <Input label="Question Paper Title" value={paperDraft.title} onChange={(event) => setPaperDraft({ ...paperDraft, title: event.target.value })} placeholder="e.g. JavaScript Certification Paper" />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Select label="Course" value={paperDraft.courseId} onChange={(event) => setPaperDraft({ ...paperDraft, courseId: event.target.value })}>
+              {COURSES.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
             </Select>
-            <Input label="Duration (min)" type="number" value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} />
-            <Input label="Total Marks" type="number" value={form.total} onChange={(e) => setForm({ ...form, total: Number(e.target.value) })} />
-            <Input label="Passing Marks" type="number" value={form.passing} onChange={(e) => setForm({ ...form, passing: Number(e.target.value) })} />
+            <Select label="Category" value={paperDraft.category} onChange={(event) => setPaperDraft({ ...paperDraft, category: event.target.value })}>
+              <option>Technical</option>
+              <option>React</option>
+              <option>JavaScript</option>
+              <option>Soft Skills</option>
+              <option>HR Compliance</option>
+            </Select>
+            <Input label="Duration (minutes)" type="number" min={1} value={paperDraft.durationMinutes} onChange={(event) => setPaperDraft({ ...paperDraft, durationMinutes: Number(event.target.value) })} />
+            <Input label="Total Marks" type="number" min={1} value={paperDraft.totalMarks} onChange={(event) => setPaperDraft({ ...paperDraft, totalMarks: Number(event.target.value) })} />
           </div>
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
-            <input type="checkbox" checked={form.negative} onChange={(e) => setForm({ ...form, negative: e.target.checked })} className="accent-maroon-600" />
-            Enable negative marking
-          </label>
+          <Textarea label="Paper Instructions" rows={3} value={paperDraft.instructions} onChange={(event) => setPaperDraft({ ...paperDraft, instructions: event.target.value })} placeholder="Rules, marking scheme, allowed tools..." />
 
-          <div>
-            <p className="text-sm font-medium text-neutral-700 mb-1.5">MCQ questions ({form.mcqIds.length})</p>
-            <div className="max-h-32 overflow-y-auto border border-neutral-200 rounded-lg p-2 space-y-1">
-              {MCQ_QUESTIONS.map((q) => (
-                <label key={q.id} className="flex items-start gap-2 text-xs text-neutral-600">
-                  <input type="checkbox" checked={form.mcqIds.includes(q.id)} onChange={() => toggleId('mcqIds', q.id)} className="accent-maroon-600 mt-0.5" />
-                  <span className="line-clamp-1">{q.question_text}</span>
-                </label>
-              ))}
+          <div className="rounded-xl border border-neutral-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-neutral-800">Upload Question Set</p>
+                <p className="text-xs text-neutral-400">Add questions manually or bulk import using CSV.</p>
+              </div>
+              <Badge variant="neutral">{totalQuestionSetCount} questions</Badge>
+            </div>
+            <Textarea label="Manual Questions" rows={5} value={paperDraft.manualQuestions} onChange={(event) => setPaperDraft({ ...paperDraft, manualQuestions: event.target.value })} placeholder="Enter one question per line." />
+            <input ref={csvInputRef} type="file" accept=".csv,text/csv" onChange={handleCSVUpload} className="hidden" />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => csvInputRef.current?.click()}>
+                <Upload className="h-4 w-4" />
+                Upload CSV
+              </Button>
+              <span className="text-xs text-neutral-400">CSV rows are counted as imported questions for this paper.</span>
             </div>
           </div>
+        </div>
+      </Modal>
 
-          <div>
-            <p className="text-sm font-medium text-neutral-700 mb-1.5">Coding questions ({form.codingIds.length})</p>
-            <div className="border border-neutral-200 rounded-lg p-2 space-y-1">
-              {CODING_QUESTIONS.map((q) => (
-                <label key={q.id} className="flex items-start gap-2 text-xs text-neutral-600">
-                  <input type="checkbox" checked={form.codingIds.includes(q.id)} onChange={() => toggleId('codingIds', q.id)} className="accent-maroon-600 mt-0.5" />
-                  <span className="line-clamp-1">{q.question_text}</span>
+      <Modal
+        isOpen={scheduleModalOpen}
+        onClose={() => { setScheduleModalOpen(false); resetScheduleForm(); }}
+        title={editingScheduleId ? 'Edit Scheduled Assessment' : 'Schedule Assessment'}
+        width={720}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setScheduleModalOpen(false); resetScheduleForm(); }}>Cancel</Button>
+            <Button onClick={saveScheduledAssessment}>{editingScheduleId ? 'Update Assessment' : 'Schedule Assessment'}</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input label="Assessment Name" value={scheduleDraft.name} onChange={(event) => setScheduleDraft({ ...scheduleDraft, name: event.target.value })} placeholder="e.g. August Certification Assessment" />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Select label="Question Paper" value={scheduleDraft.questionPaperId} onChange={(event) => setScheduleDraft({ ...scheduleDraft, questionPaperId: event.target.value })}>
+              <option value="">Select question paper</option>
+              {papers.map((paper) => <option key={paper.id} value={paper.id}>{paper.title}</option>)}
+            </Select>
+            <Input label="Duration (minutes)" type="number" min={1} value={scheduleDraft.durationMinutes} onChange={(event) => setScheduleDraft({ ...scheduleDraft, durationMinutes: Number(event.target.value) })} />
+            <Input label="Assessment Date" type="date" value={scheduleDraft.date} onChange={(event) => setScheduleDraft({ ...scheduleDraft, date: event.target.value })} />
+            <Input label="Start Time" type="time" value={scheduleDraft.startTime} onChange={(event) => setScheduleDraft({ ...scheduleDraft, startTime: event.target.value })} />
+            <Select label="Mode" value={scheduleDraft.mode} onChange={(event) => setScheduleDraft({ ...scheduleDraft, mode: event.target.value as ExamMode })}>
+              <option>Online</option>
+              <option>Offline</option>
+              <option>Hybrid</option>
+            </Select>
+            <div className="rounded-lg border border-neutral-200 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Selected Paper</p>
+              <p className="mt-1 text-sm font-medium text-neutral-800">{selectedPaper?.title ?? 'No paper selected'}</p>
+            </div>
+          </div>
+          <Textarea label="Scheduling Instructions" rows={3} value={scheduleDraft.instructions} onChange={(event) => setScheduleDraft({ ...scheduleDraft, instructions: event.target.value })} placeholder="Exam room, meeting link, proctoring notes..." />
+
+          <div className="rounded-xl border border-neutral-200 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-medium text-neutral-800">
+                  <Users className="h-4 w-4 text-maroon-600" />
+                  Invite Users
+                </p>
+                <p className="text-xs text-neutral-400">Select users to invite for this assessment.</p>
+              </div>
+              <Badge variant="neutral">{scheduleDraft.invitedUserIds.length} selected</Badge>
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-neutral-200">
+              {studentUsers.map((user) => (
+                <label key={user.id} className="flex cursor-pointer items-center gap-3 border-b border-neutral-100 px-3 py-2 last:border-b-0 hover:bg-neutral-50">
+                  <input type="checkbox" checked={scheduleDraft.invitedUserIds.includes(user.id)} onChange={() => toggleInvitee(user.id)} className="accent-maroon-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-neutral-800">{user.full_name}</span>
+                    <span className="block truncate text-xs text-neutral-400">{user.email}</span>
+                  </span>
+                  <Badge variant={user.training_status === 'completed' ? 'active' : 'draft'}>{user.training_status?.replace('_', ' ') ?? 'not started'}</Badge>
                 </label>
               ))}
             </div>

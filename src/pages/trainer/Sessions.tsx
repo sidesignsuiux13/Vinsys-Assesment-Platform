@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Video, Plus } from 'lucide-react';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -40,6 +40,24 @@ export default function TrainerSessions() {
     { key: 'module', label: 'Module' },
     { key: 'mode', label: 'Mode', render: (s) => <Badge variant="neutral">{s.mode}</Badge> },
     { key: 'duration', label: 'Duration' },
+    {
+      key: 'join',
+      label: 'Session',
+      render: (s) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={s.mode === 'Offline'}
+          onClick={() => {
+            window.open(`/session-room?role=trainer&module=${encodeURIComponent(s.module)}`, '_blank', 'noopener,noreferrer');
+            push('success', 'Opening session room...');
+          }}
+        >
+          <Video className="h-4 w-4" />
+          Join Session
+        </Button>
+      ),
+    },
   ];
 
   return (

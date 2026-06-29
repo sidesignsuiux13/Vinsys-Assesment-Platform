@@ -7,6 +7,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { Input, Select, Textarea } from '@/components/ui/Input';
 import { useToastStore } from '@/components/ui/Toast';
 import { ALL_QUESTIONS } from '@/mock/questions';
+import { COURSE, COURSES } from '@/mock/courses';
 import { uuid } from '@/lib/constants';
 import { downloadSampleQuestionsCSV, parseQuestionsCSV } from '@/lib/csv';
 import type { Difficulty, QuestionType } from '@/types';
@@ -18,6 +19,7 @@ interface QRow {
   difficulty: Difficulty;
   marks: number;
   category?: string;
+  courseId: string;
 }
 
 const TYPE_META: Record<QuestionType, { label: string; icon: typeof FileQuestion; badge: BadgeVariant }> = {
@@ -52,6 +54,8 @@ const OPTION_COUNTS = [2, 3, 4, 5, 6, 7];
 type AnswerType = 'single' | 'multiple' | 'subjective';
 
 const emptyDraft = {
+  courseId: COURSE.id,
+  questionType: 'mcq' as QuestionType,
   category: '',
   subCategory: '',
   complexity: '' as '' | Difficulty,
@@ -76,6 +80,7 @@ export default function AdminQuestions() {
       question_text: q.question_text,
       difficulty: q.difficulty,
       marks: q.marks,
+      courseId: q.course_id,
     }))
   );
   const [typeFilter, setTypeFilter] = useState('all');
@@ -98,7 +103,7 @@ export default function AdminQuestions() {
     [rows, typeFilter, diffFilter, search]
   );
 
-  const resetDraft = () => setDraft({ ...emptyDraft, options: ['', '', '', ''], correctMulti: [] });
+  const resetDraft = () => setDraft({ ...emptyDraft, courseId: COURSES[0]?.id ?? COURSE.id, options: ['', '', '', ''], correctMulti: [] });
 
   const setOptionCount = (n: number) =>
     setDraft((d) => ({
@@ -132,6 +137,7 @@ export default function AdminQuestions() {
         question_text: p.question,
         difficulty: 'easy',
         marks: p.correctIndexes.length > 1 ? 2 : 1,
+        courseId: draft.courseId,
       }));
       setRows((prev) => [...imported, ...prev]);
       push('success', `${parsed.length} question${parsed.length > 1 ? 's' : ''} imported from CSV.`);
@@ -151,7 +157,7 @@ export default function AdminQuestions() {
       push('error', 'Question text is required.');
       return;
     }
-    const type: QuestionType = draft.answerType === 'subjective' ? 'short' : 'mcq';
+    const type: QuestionType = draft.questionType;
     setRows((prev) => [
       {
         id: uuid(),
@@ -160,6 +166,7 @@ export default function AdminQuestions() {
         difficulty: draft.complexity || 'easy',
         marks: draft.marks,
         category: draft.category,
+        courseId: draft.courseId,
       },
       ...prev,
     ]);
@@ -180,6 +187,7 @@ export default function AdminQuestions() {
     },
     { key: 'type', label: 'Type', render: (r) => <Badge variant={TYPE_META[r.type].badge}>{TYPE_META[r.type].label}</Badge> },
     { key: 'difficulty', label: 'Complexity', render: (r) => <Badge variant={r.difficulty} /> },
+    { key: 'course', label: 'Course', render: (r) => <span className="text-neutral-500">{COURSES.find((course) => course.id === r.courseId)?.title ?? 'Course removed'}</span> },
     { key: 'category', label: 'Category', render: (r) => <span className="text-neutral-500">{r.category ?? 'FSWD'}</span> },
     { key: 'marks', label: 'Marks', render: (r) => <span className="font-medium text-neutral-700">{r.marks}</span> },
     {
@@ -240,6 +248,12 @@ export default function AdminQuestions() {
         }
       >
         <div className="space-y-4">
+          <Select label="Course" value={draft.courseId} onChange={(e) => setDraft({ ...draft, courseId: e.target.value })}>
+            {COURSES.map((course) => (
+              <option key={course.id} value={course.id}>{course.title}</option>
+            ))}
+          </Select>
+
           {/* Category / Sub-Category */}
           <Select label="Category" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value, subCategory: '' })}>
             <option value="">Select Question Category</option>
@@ -270,40 +284,58 @@ export default function AdminQuestions() {
           </Select>
           <p className="-mt-3 text-xs text-neutral-400">(optional)</p>
 
-          <Select label="Question Type" value={draft.questionFormat} onChange={(e) => setDraft({ ...draft, questionFormat: e.target.value })}>
+          <Select label="Question Format" value={draft.questionFormat} onChange={(e) => setDraft({ ...draft, questionFormat: e.target.value })}>
             {QUESTION_FORMATS.map((q) => (
               <option key={q} value={q}>{q}</option>
             ))}
           </Select>
 
+          <Select
+            label="Question Type"
+            value={draft.questionType}
+            onChange={(e) => {
+              const questionType = e.target.value as QuestionType;
+              setDraft({
+                ...draft,
+                questionType,
+                answerType: questionType === 'mcq' ? 'single' : questionType === 'coding' ? 'subjective' : 'subjective',
+              });
+            }}
+          >
+            <option value="mcq">MCQ</option>
+            <option value="coding">Coding</option>
+            <option value="short">Short Answer</option>
+            <option value="long">Long Answer</option>
+          </Select>
+
           {/* Question */}
           <Textarea label="Question" rows={4} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} placeholder="Enter the question…" />
 
-          {/* Answer Type */}
-          <div>
-            <p className="text-sm font-medium text-neutral-700 mb-2">Answer Type</p>
-            <div className="flex flex-wrap gap-4">
-              {([
-                { value: 'single', label: 'Single Choice' },
-                { value: 'multiple', label: 'Multiple Choice' },
-                { value: 'subjective', label: 'Subjective' },
-              ] as { value: AnswerType; label: string }[]).map((a) => (
-                <label key={a.value} className="flex items-center gap-1.5 text-sm text-neutral-700 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="answerType"
-                    checked={draft.answerType === a.value}
-                    onChange={() => setDraft({ ...draft, answerType: a.value })}
-                    className="accent-maroon-600"
-                  />
-                  {a.label}
-                </label>
-              ))}
+          {draft.questionType === 'mcq' && (
+            <div>
+              <p className="text-sm font-medium text-neutral-700 mb-2">Answer Type</p>
+              <div className="flex flex-wrap gap-4">
+                {([
+                  { value: 'single', label: 'Single Choice' },
+                  { value: 'multiple', label: 'Multiple Choice' },
+                ] as { value: AnswerType; label: string }[]).map((a) => (
+                  <label key={a.value} className="flex items-center gap-1.5 text-sm text-neutral-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="answerType"
+                      checked={draft.answerType === a.value}
+                      onChange={() => setDraft({ ...draft, answerType: a.value })}
+                      className="accent-maroon-600"
+                    />
+                    {a.label}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Options (for choice answer types) */}
-          {draft.answerType !== 'subjective' ? (
+          {draft.questionType === 'mcq' ? (
             <>
               <Select label="Options" value={draft.optionCount} onChange={(e) => setOptionCount(Number(e.target.value))}>
                 {OPTION_COUNTS.map((n) => (
